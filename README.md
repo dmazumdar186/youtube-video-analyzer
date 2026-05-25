@@ -1,6 +1,6 @@
 # YouTube Video Analyzer — Frame-by-Frame Breakdowns with Claude / Gemini Vision
 
-Go beyond plain transcripts. This tool extracts scene-change frames from any YouTube video, deduplicates them with perceptual hashing, tiles them into 3x3 grids, and sends the result to an AI vision model to produce a structured content breakdown: hook analysis, pacing cuts, visual storytelling patterns, transcript highlights, and content ideas.
+Go beyond plain transcripts. This tool extracts scene-change frames from any YouTube video, deduplicates them with perceptual hashing, tiles them into 3x3 grids, and sends the result to an AI vision model to produce a structured content breakdown: **summary**, **key takeaways**, hook analysis, pacing cuts, visual storytelling patterns, transcript highlights, and content ideas.
 
 One key. Three providers. The Gemini free path costs $0.00 per video.
 
@@ -19,6 +19,19 @@ Excerpt:
 > **13:16** — "MCP solves this connectivity problem and ADK solves the orchestration problem. They're complementary and they're not competitors."
 
 Generated for $0.00 via the Gemini free URL-native path.
+
+---
+
+## v4.1: Content-first breakdown (Summary + Key Takeaways)
+
+v4 told you HOW a video was made. v4.1 also tells you WHAT it actually says.
+
+Every breakdown now opens with two new sections rendered **before** The Hook:
+
+- **Summary** — 3-5 sentence prose overview of the video's subject, argument, and conclusion. Plain language. Stands alone without watching the video.
+- **Key Takeaways** — 1-7 complete-sentence bullets of substantive content the viewer walks away knowing. Craft observations ("creator uses fast cuts") are explicitly excluded.
+
+Both Claude tool-use and Gemini structured-JSON paths populate the new fields. Breakdowns generated from cached data before v4.1 skip the sections gracefully (backward-compat via `.get()` fallbacks).
 
 ---
 
