@@ -58,6 +58,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -76,6 +77,10 @@ log = logging.getLogger("yt_analyzer")
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent
 TMP_BASE = WORKSPACE_ROOT / ".tmp" / "video"
+
+# Mutex for vault writes in parallel batch mode (ThreadPoolExecutor path).
+# Prevents two threads racing on target_dir.mkdir + write_text for the same vault.
+_VAULT_WRITE_LOCK = threading.Lock()
 
 # v2 frame/grid constants
 MAX_FRAMES_DEFAULT = 24
@@ -655,7 +660,7 @@ def extract_frames_at_timestamps(
             "-q:v", "5",
             str(out_path),
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if result.returncode == 0 and out_path.exists():
             results.append((out_path, ts))
         else:
@@ -1008,6 +1013,16 @@ def analyze_with_claude_v2(
         usage.output_tokens,
         cache_read,
         cache_write,
+    )
+    log.info(
+        "Claude cost breakdown: %s",
+        _estimate_cost(
+            model_id,
+            usage.input_tokens,
+            est_output_tokens=usage.output_tokens,
+            cache_read_tokens=cache_read,
+            cache_write_tokens=cache_write,
+        ),
     )
 
     # Extract tool_use block
@@ -1375,7 +1390,7 @@ _TIER_COST_PER_M_TOKENS: dict[str, float] = {
     "google/gemini-2.5-pro": 1.27,
     "openai/gpt-4o": 2.65,
     "openai/gpt-4o-mini": 0.16,
-    # Direct Anthropic (no OR fee)
+    # Direct Anthropic (no OR fee) — flat blended rate for fallback / non-Anthropic paths
     "claude-sonnet-4-6": 3.00,
     "claude-opus-4-7": 15.00,
     # Gemini direct (free quota)
@@ -1383,8 +1398,43 @@ _TIER_COST_PER_M_TOKENS: dict[str, float] = {
     "gemini-3.1-flash-lite-preview": 0.00,
 }
 
+# Cache-aware Claude pricing (per million tokens) for direct Anthropic models.
+# Used by _estimate_cost when cache token breakdown is available.
+# Rates: input / cache_read (0.1× input) / cache_write (1.25× input) / output.
+_CLAUDE_PRICES: dict[str, dict[str, float]] = {
+    "claude-sonnet-4-6":         {"input": 5.00, "cache_read": 0.50, "cache_write": 6.25, "output": 25.00},
+    "claude-haiku-4-5-20251001": {"input": 2.00, "cache_read": 0.20, "cache_write": 2.50, "output": 10.00},
+    "claude-opus-4-7":           {"input": 15.00, "cache_read": 1.50, "cache_write": 18.75, "output": 75.00},
+}
 
-def _estimate_cost(mid: str, est_input_tokens: int, est_output_tokens: int = 2000) -> str:
+
+def _estimate_cost(
+    mid: str,
+    est_input_tokens: int,
+    est_output_tokens: int = 2000,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
+) -> str:
+    """Estimate API cost string.
+
+    For direct Anthropic models, uses the full 4-rate cache-aware formula when
+    cache token counts are available.  Falls back to the flat blended rate for
+    OpenRouter / Gemini models or when the model is unknown.
+    """
+    # Cache-aware path for direct Anthropic models
+    if mid in _CLAUDE_PRICES:
+        p = _CLAUDE_PRICES[mid]
+        # Uncached input = total input minus any tokens served from / written to cache
+        uncached_input = max(0, est_input_tokens - cache_read_tokens - cache_write_tokens)
+        total = (
+            uncached_input * p["input"]
+            + cache_read_tokens * p["cache_read"]
+            + cache_write_tokens * p["cache_write"]
+            + est_output_tokens * p["output"]
+        ) / 1_000_000
+        return f"~${total:.3f} expected"
+
+    # Flat blended-rate path for OpenRouter / Gemini / unknown models
     price_per_m = _TIER_COST_PER_M_TOKENS.get(mid)
     if price_per_m is None:
         # Try prefix match for unknown variants (e.g. gemini-2.5-flash-*)
@@ -1420,12 +1470,13 @@ def write_outputs(
                 obsidian_vault,
             )
         else:
-            target_dir = obsidian_vault / "Video Breakdowns"
-            target_dir.mkdir(parents=True, exist_ok=True)
-            date_str = datetime.now().strftime("%Y-%m-%d")
-            slug = slugify(metadata["title"])
-            vault_path = target_dir / f"{date_str}_{slug}.md"
-            vault_path.write_text(breakdown_md, encoding="utf-8")
+            with _VAULT_WRITE_LOCK:
+                target_dir = obsidian_vault / "Video Breakdowns"
+                target_dir.mkdir(parents=True, exist_ok=True)
+                date_str = datetime.now().strftime("%Y-%m-%d")
+                slug = slugify(metadata["title"])
+                vault_path = target_dir / f"{date_str}_{slug}.md"
+                vault_path.write_text(breakdown_md, encoding="utf-8")
 
     return primary, vault_path
 
