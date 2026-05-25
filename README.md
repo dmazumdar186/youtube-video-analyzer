@@ -22,6 +22,32 @@ Generated for $0.00 via the Gemini free URL-native path.
 
 ---
 
+## v4: Batch mode + Creator-profile cache (the differentiator)
+
+Process multiple videos in one run, and let the analyzer learn each creator's style across videos.
+
+```bash
+# Analyze 5 videos from one channel (free path, $0)
+py youtube_video_analyzer.py URL1 URL2 URL3 URL4 URL5 --tier gemini
+
+# Or from a file (one URL per line, # for comments)
+py youtube_video_analyzer.py --urls-file my_creators.txt --tier gemini
+```
+
+After the 3rd video from the same channel, a creator-style profile auto-distills: hook patterns, pacing, visual style, common topics, creator_signature. Subsequent analyses get this profile injected as context, producing breakdowns that pick up creator-specific patterns. No other open-source tool does this.
+
+**CLI additions:**
+- `--urls-file <path>` — bulk-process URLs from a file
+- `--parallel N` — opt-in concurrency (default sequential to avoid YouTube IP-blocks)
+- `--refresh-creator-profile` — force re-distillation
+- `--show-creator-profile <channel_id> --no-analyze` — inspect a profile
+- `--no-creator-profile` — skip profile read/write
+- `--no-analyze` — skip analysis pipeline (used with `--show-creator-profile`)
+
+Creator profiles are stored as JSON in `.tmp/creator_profiles/{channel_id}.json`. Batch runs write a summary to `.tmp/video/_batch_{run_id}/summary.md`.
+
+---
+
 ## Quick Start
 
 ```bash
@@ -118,18 +144,23 @@ YouTube URL
 ## CLI Reference
 
 ```
-usage: youtube_video_analyzer.py [-h] [--tier {default,premium,gemini}]
+usage: youtube_video_analyzer.py [-h] [--urls-file PATH]
+                                  [--tier {default,premium,gemini}]
                                   [--provider {openrouter,anthropic,gemini-direct,auto}]
                                   [--model MODEL] [--refresh-models]
                                   [--max-frames N] [--obsidian-vault PATH]
                                   [--dry-run] [--deep-dry-run]
                                   [--keep-source] [--refresh-transcript]
-                                  url
+                                  [--parallel N] [--refresh-creator-profile]
+                                  [--show-creator-profile CHANNEL_ID]
+                                  [--no-creator-profile] [--no-analyze]
+                                  [urls ...]
 
 positional arguments:
-  url                   YouTube video URL
+  urls                  One or more YouTube video URLs
 
 options:
+  --urls-file PATH      File with one URL per line (# lines and blanks skipped)
   --tier                Analysis tier: default (Sonnet), premium (Opus), gemini (free)
   --provider            openrouter | anthropic | gemini-direct | auto (default: auto)
   --model               Exact model ID escape hatch (bypasses registry)
@@ -140,13 +171,18 @@ options:
   --deep-dry-run        Full pipeline without AI call; real frame/token counts
   --keep-source         Keep downloaded .mp4 after analysis
   --refresh-transcript  Force re-fetch transcript even if cached
+  --parallel N          Process N URLs in parallel (default: 1 = sequential)
+  --refresh-creator-profile  Force re-distillation of creator profile
+  --show-creator-profile CHANNEL_ID  Print profile JSON; requires --no-analyze
+  --no-creator-profile  Skip creator-profile read/write for this run
+  --no-analyze          Skip analysis pipeline (used with --show-creator-profile)
 ```
 
 ---
 
 ## Testing
 
-73 tests across 7 files:
+114 tests across 9 files:
 
 | File | Tier | Description |
 |------|------|-------------|
@@ -157,6 +193,8 @@ options:
 | `tests/test_performance.py` | Performance | Wall-clock threshold, frame/dedup/grid counts, token estimate bounds, concurrent dry-runs |
 | `tests/test_monkey.py` | Monkey/Chaos | Empty URL, garbage URL, SSRF, XSS params, path traversal, invalid flags, tampered cache, empty API key |
 | `tests/canary_check.py` | Canary | Structured JSON health check: secrets, deps, ffmpeg, OR endpoint, YouTube reachability, cache age, dry-run smoke |
+| `tests/test_batch.py` | Batch (v4) | URL collection, --urls-file parsing, fail-fast validation, exit codes, batch summary file |
+| `tests/test_creator_profile.py` | Creator-profile (v4) | Schema load/save, append, distillation (mocked LLM), context formatting, CLI flags |
 
 Run fast tests (no download):
 ```bash
