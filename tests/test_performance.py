@@ -29,7 +29,8 @@ def _run(*args):
     t0 = time.perf_counter()
     result = subprocess.run(
         [sys.executable, str(SCRIPT), *args],
-        capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        env=env, cwd=str(REPO_ROOT),
     )
     elapsed = time.perf_counter() - t0
     return result, elapsed

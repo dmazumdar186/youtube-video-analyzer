@@ -160,7 +160,7 @@ def t_refresh_transcript_flag_propagates():
     script = REPO_ROOT / 'youtube_video_analyzer.py'
     help_result = subprocess.run(
         [sys.executable, str(script), '--help'],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     assert help_result.returncode == 0, f'--help failed: {help_result.stderr}'
     assert '--refresh-transcript' in help_result.stdout, (
@@ -169,7 +169,7 @@ def t_refresh_transcript_flag_propagates():
     run_result = subprocess.run(
         [sys.executable, str(script),
          'https://youtu.be/jNQXAC9IVRw', '--dry-run', '--refresh-transcript'],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     assert run_result.returncode == 0, (
         f'--dry-run --refresh-transcript returned non-zero: {run_result.returncode}\n'

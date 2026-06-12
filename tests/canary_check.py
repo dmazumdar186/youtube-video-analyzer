@@ -153,7 +153,7 @@ def get_build_sha():
     try:
         r = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
             cwd=str(REPO_ROOT), timeout=5,
         )
         if r.returncode == 0:
@@ -174,7 +174,7 @@ def check_dry_run_smoke():
     try:
         result = subprocess.run(
             [sys.executable, str(SCRIPT), ZOO_URL, "--dry-run"],
-            capture_output=True, text=True, encoding="utf-8",
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
             cwd=str(REPO_ROOT), timeout=120,
         )
     except subprocess.TimeoutExpired:

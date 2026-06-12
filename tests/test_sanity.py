@@ -22,7 +22,8 @@ def _run(*args, env_override=None):
         env.update(env_override)
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args],
-        capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        env=env, cwd=str(REPO_ROOT),
     )
 
 
@@ -33,7 +34,8 @@ def test_s1_imports_resolve():
     result = subprocess.run(
         [sys.executable, "-c",
          "import sys; sys.path.insert(0, '.'); import youtube_video_analyzer"],
-        capture_output=True, text=True, cwd=str(REPO_ROOT),
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=str(REPO_ROOT),
     )
     assert result.returncode == 0, f"Import failed:\n{result.stderr}"
 
@@ -73,7 +75,7 @@ def test_s3_dependencies_importable():
     for dep in REQUIRED_DEPS:
         result = subprocess.run(
             [sys.executable, "-c", f"import {dep}"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
         if result.returncode != 0:
             missing.append(dep)
@@ -88,7 +90,7 @@ def test_s4_ffmpeg_binary_exists():
         [sys.executable, "-c",
          "import imageio_ffmpeg; p = imageio_ffmpeg.get_ffmpeg_exe(); "
          "from pathlib import Path; assert Path(p).exists(), f'ffmpeg not found at {p}'; print(p)"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     assert result.returncode == 0, f"ffmpeg check failed:\n{result.stderr}"
 
