@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: pytest (no-API tests)
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        shell: pwsh
+
+      - name: Show env
+        run: |
+          python --version
+          pip --version
+          pip list
+        shell: pwsh
+
+      - name: Run unit tests (no API keys required)
+        run: pytest -q tests/test_unit.py tests/test_sanity.py tests/test_monkey.py
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+
+      # E2E + integration require API keys; skip in CI unless secrets are set.
+      - name: Run integration tests (only if API keys set)
+        run: |
+          if ($env:ANTHROPIC_API_KEY -or $env:GEMINI_API_KEY) {
+            pytest -q tests/test_integration.py
+          } else {
+            Write-Host "Skipping integration tests (no API keys in secrets)"
+          }
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

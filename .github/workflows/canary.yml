@@ -1,0 +1,40 @@
+name: Weekly Canary
+
+on:
+  schedule:
+    - cron: "0 13 * * 1"  # Mondays at 13:00 UTC
+  workflow_dispatch:
+
+jobs:
+  canary:
+    name: tests/canary_check.py
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        shell: pwsh
+
+      - name: Run canary_check.py
+        run: python tests/canary_check.py
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+
+      - name: Upload canary log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-log
+          path: |
+            *.log
+            canary_*.json
+          retention-days: 14
