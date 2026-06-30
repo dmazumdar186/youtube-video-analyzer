@@ -42,15 +42,19 @@ jobs:
           PYTHONIOENCODING: utf-8
 
       # E2E + integration require API keys; skip in CI unless secrets are set.
+      # test_integration.py is a custom harness (not pytest discovery): it
+      # defines `run(name, fn)` and exits 0/1 itself. Invoke as a plain
+      # script; pytest would collect 0 tests and exit non-zero.
       - name: Run integration tests (only if API keys set)
         run: |
-          if ($env:ANTHROPIC_API_KEY -or $env:GEMINI_API_KEY) {
-            pytest -q tests/test_integration.py
+          if ($env:OPENROUTER_API_KEY -or $env:ANTHROPIC_API_KEY -or $env:GEMINI_API_KEY) {
+            python tests/test_integration.py
           } else {
             Write-Host "Skipping integration tests (no API keys in secrets)"
           }
         shell: pwsh
         env:
           PYTHONIOENCODING: utf-8
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY:     ${{ secrets.GEMINI_API_KEY }}
