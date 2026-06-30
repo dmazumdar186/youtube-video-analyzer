@@ -28,6 +28,9 @@ jobs:
         shell: pwsh
         env:
           PYTHONIOENCODING: utf-8
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY:     ${{ secrets.GEMINI_API_KEY }}
 
       - name: Upload canary log on failure
         if: failure()

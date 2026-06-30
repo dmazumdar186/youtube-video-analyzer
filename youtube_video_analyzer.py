@@ -244,7 +244,7 @@ Call submit_breakdown exactly once with the structured breakdown.
 # Provider auto-detection
 # ---------------------------------------------------------------------------
 
-def _auto_detect_provider(tier: str) -> str:
+def _auto_detect_provider(tier: str, dry_run: bool = False) -> str:
     """
     Pick provider based on tier + which env vars are set.
 
@@ -252,12 +252,16 @@ def _auto_detect_provider(tier: str) -> str:
       gemini tier:
         GEMINI_API_KEY set  → gemini-direct  (free URL-native path)
         OPENROUTER_API_KEY  → openrouter      (paid frame-grid path)
-        neither             → error
+        neither             → error (or hypothetical default in --dry-run)
 
       default / premium tier:
         OPENROUTER_API_KEY  → openrouter      (preferred: one key for all models)
         ANTHROPIC_API_KEY   → anthropic        (legacy direct path)
-        neither             → error
+        neither             → error (or hypothetical default in --dry-run)
+
+    When dry_run=True and no key is set, return the provider that WOULD be
+    preferred for the tier. Dry-run output labels everything as
+    `would_call_provider`, so a hypothetical provider is honest, not misleading.
     """
     has_or = bool(os.environ.get("OPENROUTER_API_KEY"))
     has_anthropic = bool(os.environ.get("ANTHROPIC_API_KEY"))
@@ -273,6 +277,8 @@ def _auto_detect_provider(tier: str) -> str:
                 "Add GEMINI_API_KEY to .env to get the $0.00 free path."
             )
             return "openrouter"
+        if dry_run:
+            return "gemini-direct"
         raise SystemExit(
             "--tier gemini requires GEMINI_API_KEY (free URL-native path) "
             "or OPENROUTER_API_KEY (paid frame-grid mode) in .env"
@@ -283,6 +289,8 @@ def _auto_detect_provider(tier: str) -> str:
         return "openrouter"
     if has_anthropic:
         return "anthropic"
+    if dry_run:
+        return "openrouter"
     raise SystemExit(
         "--tier default/premium requires OPENROUTER_API_KEY (preferred) "
         "or ANTHROPIC_API_KEY in .env. "
@@ -2066,7 +2074,7 @@ def main() -> int:
     # Provider selection
     # ------------------------------------------------------------------
     if args.provider == "auto":
-        provider = _auto_detect_provider(tier)
+        provider = _auto_detect_provider(tier, dry_run=args.dry_run)
     else:
         provider = args.provider
 
