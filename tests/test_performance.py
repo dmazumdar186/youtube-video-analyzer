@@ -24,8 +24,7 @@ SHORT_URL = "https://www.youtube.com/watch?v=jNQXAC9IVRw"
 
 
 def _run(*args):
-    import copy
-    env = copy.copy(os.environ)
+    env = dict(os.environ)
     t0 = time.perf_counter()
     result = subprocess.run(
         [sys.executable, str(SCRIPT), *args],
@@ -124,8 +123,7 @@ def test_p8_concurrent_dry_runs():
     results = [None, None]
 
     def _run_bg(url, idx):
-        import copy
-        env = copy.copy(os.environ)
+        env = dict(os.environ)
         r = subprocess.run(
             [sys.executable, str(SCRIPT), url, "--dry-run"],
             capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),

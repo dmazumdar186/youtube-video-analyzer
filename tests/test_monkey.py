@@ -4,12 +4,13 @@ Run: py -m pytest tests/test_monkey.py -v -s
 All tests verify graceful failure. No API spend. Non-destructive.
 """
 from __future__ import annotations
-import copy
 import json
 import os
 import pathlib
 import subprocess
 import sys
+
+import pytest
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "youtube_video_analyzer.py"
@@ -18,7 +19,7 @@ CACHE_PATH = REPO_ROOT / ".tmp" / "model_registry.json"
 
 
 def _run(*args, extra_env=None):
-    env = copy.copy(os.environ)
+    env = dict(os.environ)
     if extra_env:
         env.update(extra_env)
     return subprocess.run(
@@ -154,13 +155,27 @@ def test_m13_tampered_model_registry():
 
 
 def test_m14_empty_api_key_treated_as_missing():
-    env_override = copy.copy(os.environ)
+    # Contract (post commit 49f1f9f): --dry-run is purely structural and
+    # makes no network calls, so it MUST NOT require an API key. With all
+    # three keys empty/missing, the script picks a hypothetical default
+    # provider for the tier and emits a JSON dry-run report. Real (non
+    # --dry-run) runs still hard-fail on missing keys -- see
+    # _auto_detect_provider in youtube_video_analyzer.py.
+    env_override = dict(os.environ)
     env_override["OPENROUTER_API_KEY"] = ""
     env_override.pop("ANTHROPIC_API_KEY", None)
     env_override.pop("GEMINI_API_KEY", None)
     r = _run(TEST_URL, "--dry-run", extra_env=env_override)
-    assert r.returncode != 0, f"Should fail with no valid API keys"
-    assert "OPENROUTER_API_KEY" in r.stderr or "ANTHROPIC_API_KEY" in r.stderr
+    assert r.returncode == 0, (
+        f"--dry-run must succeed without API keys (no network calls): "
+        f"exit={r.returncode}, stderr={r.stderr[-400:]}"
+    )
+    assert _no_stack_trace(r.stderr), "Stack trace on missing-key --dry-run"
+    data = json.loads(r.stdout)
+    # Hypothetical provider must still be reported -- the dry-run output
+    # is what tells the caller what WOULD have been called.
+    assert data.get("would_call_provider"), "would_call_provider missing"
+    assert data.get("would_use_model"), "would_use_model missing"
 
 
 def test_m15_massive_url():

@@ -16,8 +16,7 @@ TEST_URL = "https://youtu.be/BedAaB1RKgE"
 
 
 def _run(*args, env_override=None):
-    import copy
-    env = copy.copy(os.environ)
+    env = dict(os.environ)
     if env_override:
         env.update(env_override)
     return subprocess.run(
